@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use std::{fs::File, io::Write};
 
 struct DrawPoint {
     x: f32,
@@ -20,9 +21,16 @@ async fn main() {
     let colors_squares_dist = 10;
     let colors_squares_y = 15;
     let mut actual_color = WHITE;
+    let mut prev_mouse_pos: (f32, f32) = (0.0, 0.0);
+    let mut min_x: f32 = screen_width();
+    let mut max_x: f32 = 0.0;
+    let mut min_y: f32 = screen_height();
+    let mut max_y: f32 = 0.0;
+    const SEPARATION: f32 = 30.0;
 
     loop {
         clear_background(BLACK);
+        // println!("{}, {}", min_x, min_y);
 
         if is_key_down(KeyCode::Escape) {
             break;
@@ -44,14 +52,15 @@ async fn main() {
             for i in 0..colors.len() {
                 let color = colors[i];
 
-                let min_x = (colors_squares_dist * (i + 1) + colors_squares_width * i) as f32;
-                let max_x = (colors_squares_dist * (i + 1)
+                let min_color_x = (colors_squares_dist * (i + 1) + colors_squares_width * i) as f32;
+                let max_color_x = (colors_squares_dist * (i + 1)
                     + colors_squares_width * i
                     + colors_squares_width) as f32;
-                let min_y = colors_squares_y as f32;
-                let max_y = (colors_squares_y + colors_squares_width) as f32;
+                let min_color_y = colors_squares_y as f32;
+                let max_color_y = (colors_squares_y + colors_squares_width) as f32;
 
-                if (min_x <= mouse_x && mouse_x <= max_x) && (min_y <= mouse_y && mouse_y <= max_y)
+                if (min_color_x <= mouse_x && mouse_x <= max_color_x)
+                    && (min_color_y <= mouse_y && mouse_y <= max_color_y)
                 {
                     actual_color = color;
                 }
@@ -59,12 +68,31 @@ async fn main() {
         }
         if is_mouse_button_down(MouseButton::Left) {
             let (mouse_x, mouse_y) = mouse_position();
-            let last: &mut Draw = drawings.last_mut().expect("There is no drawing");
-            last.draw_points.push(DrawPoint {
-                x: mouse_x,
-                y: mouse_y,
-                width: drawings_width,
-            });
+
+            if mouse_x != prev_mouse_pos.0 || mouse_y != prev_mouse_pos.1 {
+                let last: &mut Draw = drawings.last_mut().expect("There is no drawing");
+                last.draw_points.push(DrawPoint {
+                    x: mouse_x,
+                    y: mouse_y,
+                    width: drawings_width,
+                });
+
+                if last.draw_points.len() >= 2 {
+                    if mouse_x < min_x {
+                        min_x = mouse_x
+                    }
+                    if mouse_x > max_x {
+                        max_x = mouse_x
+                    }
+                    if mouse_y < min_y {
+                        min_y = mouse_y
+                    }
+                    if mouse_y > max_y {
+                        max_y = mouse_y
+                    }
+                }
+                prev_mouse_pos = (mouse_x, mouse_y);
+            }
         }
         if is_mouse_button_released(MouseButton::Left) {
             let last: &Draw = drawings.last().expect("There is no drawing");
@@ -112,4 +140,43 @@ async fn main() {
 
         next_frame().await
     }
+
+    let mut paths_strs: String = String::new();
+    for drawing in &drawings {
+        let color = drawing.color;
+        let (x, y) = (drawing.draw_points[0].x, drawing.draw_points[0].y);
+        let mut path_str = format!("M{} {}", x, y);
+
+        for i in 1..(drawing.draw_points.len() - 1) {
+            let (x, y) = (drawing.draw_points[i].x, drawing.draw_points[i].y);
+            path_str.push_str(format!(" L{} {}", x, y).as_str());
+        }
+
+        let path = format!(
+            "<path transform='translate({} {})' d='{}' style='fill:none;stroke:rgba({},{},{},{});stroke-width:3' />",
+            -min_x + SEPARATION,
+            -min_y + SEPARATION,
+            path_str,
+            (color.r * 255.0) as i32,
+            (color.g * 255.0) as i32,
+            (color.b * 255.0) as i32,
+            (color.a * 255.0) as i32
+        );
+        paths_strs.push_str(&format!("{}\n", path));
+    }
+    let svg_height: f32 = max_y - min_y;
+    let svg_width: f32 = max_x - min_x;
+    let mut prefijo: String = format!(
+        "<svg width='{}' height='{}' xmlns='http://www.w3.org/2000/svg'>\n",
+        svg_width + SEPARATION * 2.0,
+        svg_height + SEPARATION * 2.0
+    );
+    let sufijo: &str = "</svg>";
+
+    prefijo.push_str(&paths_strs);
+    prefijo.push_str(sufijo);
+
+    // println!("{min_y}, {max_y}, {min_x}, {max_x}");
+    let mut file = File::create("drawings.svg").expect("Problem with the file");
+    File::write(&mut file, prefijo.as_bytes());
 }
