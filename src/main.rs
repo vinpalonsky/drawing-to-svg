@@ -141,15 +141,28 @@ async fn main() {
         next_frame().await
     }
 
+    let mid_x: f32 = (min_x + max_x) / 2.0;
+    let mid_y: f32 = (min_y + max_y) / 2.0;
     let mut paths_strs: String = String::new();
     for drawing in &drawings {
         let color = drawing.color;
         let (x, y) = (drawing.draw_points[0].x, drawing.draw_points[0].y);
-        let mut path_str = format!("M{} {}", x - min_x, y - min_y);
+        let mut path_str = format!("M{} {}", x - mid_x, y - mid_y);
 
         for i in 1..(drawing.draw_points.len() - 1) {
-            let (x, y) = (drawing.draw_points[i].x, drawing.draw_points[i].y);
-            path_str.push_str(format!(" L{} {}", x - min_x, y - min_y).as_str());
+            let (mut prev_x, mut prev_y) =
+                (drawing.draw_points[i - 1].x, drawing.draw_points[i - 1].y);
+            let (mut x, mut y) = (drawing.draw_points[i].x, drawing.draw_points[i].y);
+
+            prev_x = prev_x - mid_x;
+            prev_y = prev_y - mid_y;
+            x = x - mid_x;
+            y = y - mid_y;
+
+            let control_x: f32 = (prev_x + x) / 2.0;
+            let control_y: f32 = (prev_y + y) / 2.0;
+
+            path_str.push_str(format!(" Q{} {} {} {}", control_x, control_y, x, y).as_str());
         }
 
         let path = format!(
@@ -165,8 +178,13 @@ async fn main() {
     let svg_height: f32 = max_y - min_y;
     let svg_width: f32 = max_x - min_x;
     let mut prefijo: String = format!(
-        "<svg width='{}' height='{}' xmlns='http://www.w3.org/2000/svg'>\n",
-        svg_width, svg_height
+        "<svg width='{}' height='{}' viewBox='{} {} {} {}' xmlns='http://www.w3.org/2000/svg'>\n",
+        svg_width,
+        svg_height,
+        -svg_width / 2.0,
+        -svg_height / 2.0,
+        svg_width,
+        svg_height
     );
     let sufijo: &str = "</svg>";
 
