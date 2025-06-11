@@ -4,18 +4,18 @@ use std::{fs::File, io::Write};
 struct DrawPoint {
     x: f32,
     y: f32,
-    width: f32,
 }
 
 struct Draw {
     draw_points: Vec<DrawPoint>,
     color: Color,
+    width: f32,
 }
 
 #[macroquad::main("InputKeys")]
 async fn main() {
     let mut drawings: Vec<Draw> = Vec::new();
-    let mut drawings_width: f32 = 1.0;
+    let mut drawing_width: f32 = 1.0;
     let colors: [Color; 8] = [WHITE, GRAY, BLUE, GREEN, GOLD, PURPLE, RED, BROWN];
     let colors_squares_width = 20;
     let colors_squares_dist = 10;
@@ -40,12 +40,36 @@ async fn main() {
         {
             if drawings.len() > 0 {
                 drawings.truncate(drawings.len() - 1);
+
+                min_x = screen_width();
+                max_x = 0.0;
+                min_y = screen_height();
+                max_y = 0.0;
+
+                for drawing in &drawings {
+                    for draw_point in &drawing.draw_points {
+                        let (x, y) = (draw_point.x, draw_point.y);
+                        if x < min_x {
+                            min_x = x
+                        }
+                        if x > max_x {
+                            max_x = x
+                        }
+                        if y < min_y {
+                            min_y = y
+                        }
+                        if y > max_y {
+                            max_y = y
+                        }
+                    }
+                }
             }
         }
         if is_mouse_button_pressed(MouseButton::Left) {
             drawings.push(Draw {
                 draw_points: Vec::new(),
                 color: actual_color,
+                width: drawing_width,
             });
 
             let (mouse_x, mouse_y) = mouse_position();
@@ -74,7 +98,6 @@ async fn main() {
                 last.draw_points.push(DrawPoint {
                     x: mouse_x,
                     y: mouse_y,
-                    width: drawings_width,
                 });
 
                 if last.draw_points.len() >= 2 {
@@ -102,27 +125,19 @@ async fn main() {
         }
         let button_wheel = mouse_wheel().1;
         if button_wheel > 0.0 {
-            drawings_width += 0.2;
+            drawing_width += 0.2;
         }
-        if button_wheel < 0.0 && drawings_width > 1.0 {
-            drawings_width -= 0.2;
+        if button_wheel < 0.0 && drawing_width > 1.0 {
+            drawing_width -= 0.2;
         }
 
         for drawing in &drawings {
             if drawing.draw_points.len() >= 2 {
                 for i in 0..(drawing.draw_points.len() - 1) {
-                    let DrawPoint {
-                        x: x1,
-                        y: y1,
-                        width,
-                    } = &drawing.draw_points[i];
-                    let DrawPoint {
-                        x: x2,
-                        y: y2,
-                        width: _,
-                    } = &drawing.draw_points[i + 1];
+                    let DrawPoint { x: x1, y: y1 } = &drawing.draw_points[i];
+                    let DrawPoint { x: x2, y: y2 } = &drawing.draw_points[i + 1];
 
-                    draw_line(*x1, *y1, *x2, *y2, *width, drawing.color);
+                    draw_line(*x1, *y1, *x2, *y2, drawing.width, drawing.color);
                 }
             }
         }
@@ -166,12 +181,13 @@ async fn main() {
         }
 
         let path = format!(
-            "<path d='{}' style='fill:none;stroke:rgba({},{},{},{});stroke-width:3' />",
+            "<path d='{}' style='fill:none;stroke:rgba({},{},{},{});stroke-width:{}' />",
             path_str,
             (color.r * 255.0) as i32,
             (color.g * 255.0) as i32,
             (color.b * 255.0) as i32,
-            (color.a * 255.0) as i32
+            (color.a * 255.0) as i32,
+            drawing.width as i32
         );
         paths_strs.push_str(&format!("{}\n", path));
     }
