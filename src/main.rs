@@ -145,17 +145,15 @@ async fn main() {
     for drawing in &drawings {
         let color = drawing.color;
         let (x, y) = (drawing.draw_points[0].x, drawing.draw_points[0].y);
-        let mut path_str = format!("M{} {}", x, y);
+        let mut path_str = format!("M{} {}", x - min_x, y - min_y);
 
         for i in 1..(drawing.draw_points.len() - 1) {
             let (x, y) = (drawing.draw_points[i].x, drawing.draw_points[i].y);
-            path_str.push_str(format!(" L{} {}", x, y).as_str());
+            path_str.push_str(format!(" L{} {}", x - min_x, y - min_y).as_str());
         }
 
         let path = format!(
-            "<path transform='translate({} {})' d='{}' style='fill:none;stroke:rgba({},{},{},{});stroke-width:3' />",
-            -min_x + SEPARATION,
-            -min_y + SEPARATION,
+            "<path d='{}' style='fill:none;stroke:rgba({},{},{},{});stroke-width:3' />",
             path_str,
             (color.r * 255.0) as i32,
             (color.g * 255.0) as i32,
@@ -168,8 +166,7 @@ async fn main() {
     let svg_width: f32 = max_x - min_x;
     let mut prefijo: String = format!(
         "<svg width='{}' height='{}' xmlns='http://www.w3.org/2000/svg'>\n",
-        svg_width + SEPARATION * 2.0,
-        svg_height + SEPARATION * 2.0
+        svg_width, svg_height
     );
     let sufijo: &str = "</svg>";
 
